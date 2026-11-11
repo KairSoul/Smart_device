@@ -28,27 +28,30 @@ bộ thông số được đồng bộ thời gian thực được lưu trữ v�
 
 ```mermaid
 graph TD
-    subgraph EDGE["1. Thu thập & Tiền xử lý tại biên (Edge)"]
-        A["Cảm biến MAX30102<br>(Đọc tín hiệu quang học PPG)"] -->|Giao tiếp I2C| B["ESP32-C3 Mini<br>(Lọc nhiễu & Tính BPM, SpO2, HRV)"]
+    subgraph EDGE["1. LỚP THIẾT BỊ BIÊN (EDGE)"]
+        A1["Cảm biến BME280<br>(Nhiệt độ, Độ ẩm, Áp suất)"] -->|Giao tiếp I2C| B["ESP32-C3 SuperMini<br>(Lọc nhiễu & Đóng gói JSON)"]
+        A2["Cảm biến MAX30102<br>(Nhịp tim BPM, SpO2, HRV)"] -->|Giao tiếp I2C| B
+        B -->|Hiển thị| O["Màn hình OLED & LED"]
     end
 
-    B -->|Đóng gói JSON & Publish qua Wi-Fi| C["MQTT Broker<br>(Cloud Broker)"]
+    B -->|Publish qua Wi-Fi| C["MQTT Broker<br>(HiveMQ / EMQX Cloud)"]
 
-    subgraph CLOUD["2. Xử lý trung tâm & Đám mây (Cloud Server)"]
-        C -->|Subscribe Topic| D["Node-RED Server<br>(Nhận dữ liệu & Lưu trữ Database)"]
-        D --> E["AI Engine<br>(Machine Learning phân tích đa biến)"]
+    subgraph CLOUD["2. LỚP TRUNG TÂM & ĐÁM MÂY (SERVER)"]
+        C -->|Subscribe Topic| D["Node-RED Server<br>(Nhận dữ liệu & Lưu Database)"]
+        D --> E["AI Engine<br>(Dự đoán Thời tiết & Sức khỏe)"]
     end
 
-    E -->|Phát hiện chỉ số nguy hiểm| F["Hệ thống cảnh báo tự động"]
+    E -->|Phân tích & Cảnh báo| F["Hệ thống Phản hồi Tự động"]
 
-    subgraph APP["3. Thông báo & Trực quan hóa (Presentation)"]
-        F --> G["Node-RED Dashboard<br>(Biểu đồ thời gian thực trên PC / Mobile)"]
-        F -->|Gửi yêu cầu HTTP POST| H["Dịch vụ thông báo thứ 3<br>(Telegram Bot / Webhook tới Người thân)"]
+    subgraph APP["3. LỚP HIỂN THỊ & THÔNG BÁO (PRESENTATION)"]
+        F --> G["Node-RED Dashboard<br>(Biểu đồ thống kê trên PC / Mobile)"]
+        F -->|Khi có nguy hiểm| H["Dịch vụ Thông báo Đám mây<br>(Telegram Bot / Webhook báo Người thân)"]
     end
 
     style EDGE fill:#f9f,stroke:#333,stroke-width:2px
     style CLOUD fill:#bbf,stroke:#333,stroke-width:2px
     style APP fill:#bfb,stroke:#333,stroke-width:2px
+```
 
 **3.2. Phần cứng**
 
@@ -63,30 +66,28 @@ graph TD
 | **Nút bấm (Push Button)** | Thao tác nhanh / Gửi tín hiệu test thủ công |
 | **Pin Li-ion + mạch sạc (TP4056)** | Cung cấp nguồn di động cho thiết bị hoạt động liên tục |
 
+
 **3.3. Lưu đồ thuật toán**
 
 ```mermaid
-graph TD
-    subgraph EDGE["1. Thu thập & Tiền xử lý tại biên (Edge)"]
-        A["Cảm biến MAX30102<br>(Đọc tín hiệu quang học PPG)"] -->|Giao tiếp I2C| B["ESP32-C3 Mini<br>(Lọc nhiễu & Tính BPM, SpO2, HRV)"]
-    end
+flowchart TD
+    Start(["Bắt đầu (Khởi động hệ thống)"]) --> Init["Khởi tạo I2C (BME280, MAX30102)<br>Kết nối Wi-Fi & MQTT Broker"]
+    Init --> Read["Đọc dữ liệu: Nhiệt độ, Độ ẩm, Áp suất<br>& Tín hiệu PPG (BPM, SpO2, HRV)"]
+    Read --> Filter["Lọc nhiễu tín hiệu & Đóng gói chuỗi JSON"]
+    Filter --> Pub["Publish dữ liệu lên MQTT Broker"]
+    Pub --> NodeRed["Node-RED nhận dữ liệu, lưu Database<br>& Cập nhật biểu đồ Dashboard"]
+    NodeRed --> AI["AI Engine dự đoán chất lượng thời tiết<br>& Phân loại trạng thái sức khỏe"]
+    AI --> Check{"Phát hiện rủi ro?<br>(Sốc nhiệt / Tụt SpO2 / Nhịp tim bất thường)"}
+    Check -- "Không (An toàn)" --> Read
+    Check -- "Có (Nguy hiểm)" --> Alert["Gửi tin nhắn khẩn cấp (Telegram/Webhook)<br>tới Người thân & Cảnh báo trên Dashboard"]
+    Alert --> Read
+```
+**3.4. Hướng phát triển thêm**
 
-    B -->|Đóng gói JSON & Publish qua Wi-Fi| C["MQTT Broker<br>(Cloud Broker)"]
+Để nâng cấp thiết bị từ mô hình thử nghiệm thành một sản phẩm hoàn chỉnh có tính thương mại và ứng dụng thực tiễn cao hơn, dự án đề xuất các hướng mở rộng sau:
 
-    subgraph CLOUD["2. Xử lý trung tâm & Đám mây (Cloud Server)"]
-        C -->|Subscribe Topic| D["Node-RED Server<br>(Nhận dữ liệu & Lưu trữ Database)"]
-        D --> E["AI Engine<br>(Machine Learning phân tích đa biến)"]
-    end
-
-    E -->|Phát hiện chỉ số nguy hiểm| F["Hệ thống cảnh báo tự động"]
-
-    subgraph APP["3. Thông báo & Trực quan hóa (Presentation)"]
-        F --> G["Node-RED Dashboard<br>(Biểu đồ thời gian thực trên PC / Mobile)"]
-        F -->|Gửi yêu cầu HTTP POST| H["Dịch vụ thông báo thứ 3<br>(Telegram Bot / Webhook / Email tới Người thân)"]
-    end
-
-    style EDGE fill:#f9f,stroke:#333,stroke-width:2px
-    style CLOUD fill:#bbf,stroke:#333,stroke-width:2px
-    style APP fill:#bfb,stroke:#333,stroke-width:2px
-
-
+* **Tích hợp cảm biến gia tốc (MPU6050) để khử nhiễu chuyển động:** Bổ sung cảm biến chuyển động nhằm nhận diện trạng thái người dùng (đang nghỉ ngơi, đi bộ hay chạy bộ). Điều này giúp thuật toán lọc bỏ nhiễu tín hiệu quang học (Motion Artifacts) trên **MAX30102** và giúp mô hình AI không báo động giả khi nhịp tim tăng tự nhiên lúc tập thể dục.
+* **Triển khai AI tại biên (TinyML / Edge AI):** Chuyển đổi mô hình học máy sang định dạng **TensorFlow Lite for Microcontrollers** hoặc xuất trực tiếp ra mã C/C++ nhúng thẳng vào **ESP32-C3 SuperMini**. Thiết bị sẽ có khả năng tự phân tích và phát cảnh báo tức thời ngay cả khi mất kết nối mạng Wi-Fi hoặc đứt kết nối tới **MQTT Broker**.
+* **Mở rộng đo chất lượng không khí trong nhà (IAQ):** Nâng cấp hoặc kết hợp thêm các cảm biến đo bụi mịn (**PM2.5**) và nồng độ khí $\text{CO}_2$, **VOCs** (như **BME680** hoặc **SGP30**) bên cạnh **BME280**, giúp đánh giá toàn diện tác động của ô nhiễm không khí đến hệ hô hấp và chỉ số $\text{SpO}_2$.
+* **Tối ưu hóa năng lượng và thiết kế phần cứng đeo tay:** Thiết kế mạch in (**PCB**) thu gọn kích thước và in 3D vỏ hộp dạng vòng đeo tay hoặc thiết bị kẹp ngón tay di động; kết hợp chế độ ngủ sâu (**Deep Sleep**) trên ESP32-C3 để kéo dài thời lượng sử dụng pin Li-ion lên nhiều ngày.
+* **Xây dựng ứng dụng di động độc lập và cá nhân hóa AI:** Phát triển ứng dụng di động riêng (bằng **Flutter** hoặc **React Native**) thay thế dần giao diện web của **Node-RED Dashboard**, đồng thời cho phép mô hình AI tự học hỏi (Fine-tuning) theo dữ liệu lịch sử riêng biệt của từng độ tuổi và bệnh lý nền của người dùng.
