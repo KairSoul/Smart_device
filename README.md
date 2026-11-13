@@ -1,4 +1,4 @@
-** THÔNG TIN ĐỀ TÀI**
+
 
   **TÊN ĐỀ TÀI:** Thiết bị đeo tay thông minh dự đoán biến đổi thời tiết và theo dõi sức khỏe người dùng
 
